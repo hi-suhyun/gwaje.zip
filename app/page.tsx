@@ -5,9 +5,14 @@ import Nav from '@/components/Nav'
 import AssignmentCard from '@/components/AssignmentCard'
 import DownloadModal from '@/components/DownloadModal'
 import { MOCK_ASSIGNMENTS, DEPARTMENTS } from '@/lib/mock-data'
+import { confirmDownloadAction } from '@/app/actions/download'
+import type { Assignment } from '@/types'
+
+type AssignmentWithLikes = Assignment & { likes: number }
 
 export default function Home() {
-  const [points, setPoints] = useState(50)
+  const [assignments, setAssignments] = useState<AssignmentWithLikes[]>([])
+  const [userPoints, setUserPoints] = useState(0)
   const [downloads, setDownloads] = useState<string[]>([])
   const [bookmarks, setBookmarks] = useState<string[]>([])
   const [downloadTarget, setDownloadTarget] = useState<string | null>(null)
@@ -20,18 +25,39 @@ export default function Home() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    const p = localStorage.getItem('gj_points')
-    const d = localStorage.getItem('gj_downloads')
-    const b = localStorage.getItem('gj_bookmarks')
-    if (p) setPoints(parseInt(p))
-    if (d) setDownloads(JSON.parse(d))
-    if (b) setBookmarks(JSON.parse(b))
+    loadData()
   }, [])
 
-  function saveState(newPoints: number, newDownloads: string[], newBookmarks: string[]) {
-    localStorage.setItem('gj_points', String(newPoints))
-    localStorage.setItem('gj_downloads', JSON.stringify(newDownloads))
-    localStorage.setItem('gj_bookmarks', JSON.stringify(newBookmarks))
+  async function loadData() {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
+    // 과제 목록 (공개된 것)
+    const { data: dbAssignments } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+
+    setAssignments(
+      dbAssignments && dbAssignments.length > 0
+        ? dbAssignments.map(a => ({ ...a, likes: 0 }))
+        : MOCK_ASSIGNMENTS
+    )
+
+    // 유저 정보
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const [profileRes, downloadsRes, bookmarksRes] = await Promise.all([
+      supabase.from('profiles').select('points').eq('id', user.id).single(),
+      supabase.from('downloads').select('assignment_id').eq('user_id', user.id),
+      supabase.from('bookmarks').select('assignment_id').eq('user_id', user.id),
+    ])
+
+    if (profileRes.data) setUserPoints(profileRes.data.points)
+    if (downloadsRes.data) setDownloads(downloadsRes.data.map(d => d.assignment_id))
+    if (bookmarksRes.data) setBookmarks(bookmarksRes.data.map(b => b.assignment_id))
   }
 
   function showToast(msg: string) {
@@ -41,35 +67,45 @@ export default function Home() {
     setToastTimer(t)
   }
 
-  function handleDownload(id: string) {
-    setDownloadTarget(id)
-  }
-
-  function confirmDownload() {
+  async function confirmDownload() {
     if (!downloadTarget) return
-    const assignment = MOCK_ASSIGNMENTS.find(a => a.id === downloadTarget)!
-    if (points < assignment.point_cost) return
 
-    const newPoints = points - assignment.point_cost
-    const newDownloads = [...downloads, downloadTarget]
-    setPoints(newPoints)
-    setDownloads(newDownloads)
-    saveState(newPoints, newDownloads, bookmarks)
+    const result = await confirmDownloadAction(downloadTarget)
     setDownloadTarget(null)
-    showToast('✅ 다운로드 완료! (실제 파일은 Supabase 연결 후 제공됩니다)')
+
+    if (result.error) {
+      showToast(`⚠ ${result.error}`)
+      return
+    }
+
+    if (result.url) {
+      setDownloads(prev => [...prev, downloadTarget])
+      setUserPoints(prev => prev - 10)
+      window.open(result.url, '_blank')
+      showToast('✅ 다운로드 완료!')
+    }
   }
 
-  function toggleBookmark(id: string) {
-    const newBookmarks = bookmarks.includes(id)
-      ? bookmarks.filter(b => b !== id)
-      : [...bookmarks, id]
-    setBookmarks(newBookmarks)
-    saveState(points, downloads, newBookmarks)
-    showToast(bookmarks.includes(id) ? '북마크 해제됨' : '🔖 북마크 추가됨')
+  async function toggleBookmark(id: string) {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) { showToast('로그인 후 이용 가능합니다.'); return }
+
+    if (bookmarks.includes(id)) {
+      await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('assignment_id', id)
+      setBookmarks(prev => prev.filter(b => b !== id))
+      showToast('북마크 해제됨')
+    } else {
+      await supabase.from('bookmarks').insert({ user_id: user.id, assignment_id: id })
+      setBookmarks(prev => [...prev, id])
+      showToast('🔖 북마크 추가됨')
+    }
   }
 
   const filtered = useMemo(() => {
-    return MOCK_ASSIGNMENTS.filter(a => {
+    return assignments.filter(a => {
       if (filterDept && a.department !== filterDept) return false
       if (filterGrade === 'A+만' && a.grade !== 'A+') return false
       if (filterGrade === 'A0이상' && a.grade !== 'A+' && a.grade !== 'A0') return false
@@ -84,16 +120,15 @@ export default function Home() {
       }
       return true
     })
-  }, [filterDept, filterGrade, filterBookmark, search, bookmarks])
+  }, [assignments, filterDept, filterGrade, filterBookmark, search, bookmarks])
 
-  const targetAssignment = downloadTarget ? MOCK_ASSIGNMENTS.find(a => a.id === downloadTarget) : null
+  const targetAssignment = downloadTarget ? assignments.find(a => a.id === downloadTarget) : null
 
   return (
     <>
       <Nav />
 
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '48px 24px' }}>
-        {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <span style={{
             display: 'inline-block', background: 'var(--primary-light)', color: 'var(--primary-dark)',
@@ -160,8 +195,7 @@ export default function Home() {
               flex: 1, minWidth: 180,
               background: 'var(--bg)', border: '1.5px solid var(--border)',
               color: 'var(--text)', borderRadius: 8,
-              padding: '9px 14px', fontSize: 13, fontFamily: 'inherit',
-              outline: 'none',
+              padding: '9px 14px', fontSize: 13, fontFamily: 'inherit', outline: 'none',
             }}
           />
         </div>
@@ -179,7 +213,7 @@ export default function Home() {
                 assignment={a}
                 isDownloaded={downloads.includes(a.id)}
                 isBookmarked={bookmarks.includes(a.id)}
-                onDownload={handleDownload}
+                onDownload={id => setDownloadTarget(id)}
                 onBookmark={toggleBookmark}
               />
             ))}
@@ -187,17 +221,15 @@ export default function Home() {
         )}
       </main>
 
-      {/* Download Modal */}
       {downloadTarget && targetAssignment && (
         <DownloadModal
           assignment={targetAssignment}
-          points={points}
+          points={userPoints}
           onConfirm={confirmDownload}
           onClose={() => setDownloadTarget(null)}
         />
       )}
 
-      {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',

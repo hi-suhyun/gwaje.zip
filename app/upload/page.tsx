@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Nav from '@/components/Nav'
 
 type Grade = 'A+' | 'A0' | 'B+' | 'B0' | 'other' | ''
@@ -27,12 +28,14 @@ const GRADES: { value: Grade; label: string }[] = [
 ]
 
 export default function UploadPage() {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<FormData>({
     title: '', school: '', department: '', subject: '', professor: '',
     grade: '', hasFeedback: false, assignmentFile: null, transcriptFile: null,
   })
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   function update(field: keyof FormData, value: FormData[keyof FormData]) {
@@ -53,10 +56,61 @@ export default function UploadPage() {
     setStep(s => s + 1)
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.assignmentFile) { setError('과제 파일을 첨부해주세요.'); return }
-    // Supabase 연결 후 실제 업로드 처리
-    setSubmitted(true)
+    setError('')
+    setLoading(true)
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth'); return }
+
+      const assignmentId = crypto.randomUUID()
+      const fileExt = form.assignmentFile.name.split('.').pop()
+      const filePath = `${user.id}/${assignmentId}/assignment.${fileExt}`
+
+      // 과제 파일 업로드
+      const { error: uploadError } = await supabase.storage
+        .from('assignments')
+        .upload(filePath, form.assignmentFile)
+      if (uploadError) throw uploadError
+
+      // 성적표 파일 업로드 (있으면)
+      let transcriptPath: string | null = null
+      if (form.transcriptFile) {
+        const tExt = form.transcriptFile.name.split('.').pop()
+        transcriptPath = `${user.id}/${assignmentId}/transcript.${tExt}`
+        const { error: tError } = await supabase.storage
+          .from('transcripts')
+          .upload(transcriptPath, form.transcriptFile)
+        if (tError) throw tError
+      }
+
+      // DB에 과제 정보 저장
+      const { error: dbError } = await supabase.from('assignments').insert({
+        id: assignmentId,
+        uploader_id: user.id,
+        title: form.title,
+        school: form.school,
+        department: form.department,
+        subject: form.subject,
+        professor: form.professor || null,
+        grade: form.grade,
+        file_url: filePath,
+        transcript_url: transcriptPath,
+        has_professor_feedback: form.hasFeedback,
+      })
+      if (dbError) throw dbError
+
+      setSubmitted(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '업로드 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const isExcellent = form.grade === 'A+' || form.grade === 'A0'
@@ -271,7 +325,9 @@ export default function UploadPage() {
                 {error && <ErrorBox msg={error} />}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={btnGhost} onClick={() => setStep(2)}>← 이전</button>
-                  <button style={{ ...btnPrimary, flex: 2 }} onClick={handleSubmit}>✅ 업로드 완료</button>
+                  <button style={{ ...btnPrimary, flex: 2, opacity: loading ? 0.6 : 1 }} onClick={handleSubmit} disabled={loading}>
+                    {loading ? '업로드 중...' : '✅ 업로드 완료'}
+                  </button>
                 </div>
               </div>
             )}

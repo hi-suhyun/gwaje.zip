@@ -2,16 +2,32 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import { getProfileAction } from '@/app/actions/download'
+
+type Profile = { nickname: string; points: number } | null
 
 export default function Nav() {
-  const [points, setPoints] = useState(50)
+  const [profile, setProfile] = useState<Profile>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    const stored = localStorage.getItem('gj_points')
-    if (stored) setPoints(parseInt(stored))
-  }, [])
+    getProfileAction().then(p => {
+      setProfile(p)
+      setLoading(false)
+    })
+  }, [pathname])
+
+  async function handleLogout() {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setProfile(null)
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <nav style={{
@@ -29,42 +45,62 @@ export default function Nav() {
           과제<span style={{ color: 'var(--primary)' }}>.zip</span>
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <Link href="/" style={{
-            background: 'none', border: 'none', fontSize: 14, fontWeight: 600,
+            fontSize: 14, fontWeight: 600,
             color: pathname === '/' ? 'var(--text)' : 'var(--subtext)',
-            cursor: 'pointer', textDecoration: 'none', transition: 'color .15s',
+            textDecoration: 'none',
           }}>
             과제 탐색
           </Link>
 
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--gold-bg)', border: '1px solid rgba(217,119,6,0.2)',
-            padding: '5px 12px', borderRadius: 20,
-            fontSize: 13, fontWeight: 600, color: 'var(--gold)',
-          }}>
-            ⬡ <span>{points} P</span>
-          </div>
+          {!loading && profile && (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'var(--gold-bg)', border: '1px solid rgba(217,119,6,0.2)',
+                padding: '5px 12px', borderRadius: 20,
+                fontSize: 13, fontWeight: 600, color: 'var(--gold)',
+              }}>
+                ⬡ {profile.points} P
+              </div>
 
-          <Link href="/upload" style={{
-            background: 'var(--primary)', color: '#fff', border: 'none',
-            borderRadius: 10, padding: '10px 18px',
-            fontSize: 14, fontWeight: 700,
-            cursor: 'pointer', transition: 'background .2s', textDecoration: 'none',
-          }}>
-            📤 업로드
-          </Link>
+              <Link href="/upload" style={{
+                background: 'var(--primary)', color: '#fff',
+                borderRadius: 10, padding: '10px 18px',
+                fontSize: 14, fontWeight: 700, textDecoration: 'none',
+              }}>
+                📤 업로드
+              </Link>
 
-          <Link href="/auth" style={{
-            background: 'none',
-            border: '1.5px solid var(--border)',
-            color: 'var(--text)', borderRadius: 10,
-            padding: '9px 18px', fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', transition: 'background .15s', textDecoration: 'none',
-          }}>
-            로그인
-          </Link>
+              <button onClick={handleLogout} style={{
+                background: 'none', border: '1.5px solid var(--border)',
+                color: 'var(--subtext)', borderRadius: 10,
+                padding: '9px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}>
+                로그아웃
+              </button>
+            </>
+          )}
+
+          {!loading && !profile && (
+            <>
+              <Link href="/upload" style={{
+                background: 'var(--primary)', color: '#fff',
+                borderRadius: 10, padding: '10px 18px',
+                fontSize: 14, fontWeight: 700, textDecoration: 'none',
+              }}>
+                📤 업로드
+              </Link>
+              <Link href="/auth" style={{
+                background: 'none', border: '1.5px solid var(--border)',
+                color: 'var(--text)', borderRadius: 10,
+                padding: '9px 18px', fontSize: 14, fontWeight: 600, textDecoration: 'none',
+              }}>
+                로그인
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>
