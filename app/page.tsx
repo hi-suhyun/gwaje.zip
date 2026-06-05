@@ -12,6 +12,7 @@ type AssignmentWithLikes = Assignment & { likes: number }
 
 export default function Home() {
   const [assignments, setAssignments] = useState<AssignmentWithLikes[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
   const [userPoints, setUserPoints] = useState(0)
   const [downloads, setDownloads] = useState<string[]>([])
   const [bookmarks, setBookmarks] = useState<string[]>([])
@@ -48,6 +49,7 @@ export default function Home() {
     // 유저 정보
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    setUserId(user.id)
 
     const [profileRes, downloadsRes, bookmarksRes] = await Promise.all([
       supabase.from('profiles').select('points').eq('id', user.id).single(),
@@ -81,6 +83,15 @@ export default function Home() {
     if (result.url) {
       setDownloads(prev => [...prev, downloadTarget])
       setUserPoints(prev => prev - 10)
+      window.open(result.url, '_blank')
+      showToast('✅ 다운로드 완료!')
+    }
+  }
+
+  async function redownload(id: string) {
+    const result = await confirmDownloadAction(id)
+    if (result.error) { showToast(`⚠ ${result.error}`); return }
+    if (result.url) {
       window.open(result.url, '_blank')
       showToast('✅ 다운로드 완료!')
     }
@@ -211,9 +222,11 @@ export default function Home() {
               <AssignmentCard
                 key={a.id}
                 assignment={a}
+                userId={userId}
                 isDownloaded={downloads.includes(a.id)}
                 isBookmarked={bookmarks.includes(a.id)}
                 onDownload={id => setDownloadTarget(id)}
+                onRedownload={redownload}
                 onBookmark={toggleBookmark}
               />
             ))}

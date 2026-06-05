@@ -6,6 +6,7 @@ export type Assignment = {
   subject: string
   professor: string | null
   grade: '하' | '중하' | '중' | '중상' | '상'
+  description: string | null
   file_url: string
   transcript_url: string | null
   has_professor_feedback: boolean

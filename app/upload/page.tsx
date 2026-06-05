@@ -13,6 +13,7 @@ type FormData = {
   department: string
   subject: string
   professor: string
+  description: string
   grade: ScoreLevel
   hasFeedback: boolean
   assignmentFile: File | null
@@ -31,7 +32,7 @@ export default function UploadPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<FormData>({
-    title: '', school: '', department: '', subject: '', professor: '',
+    title: '', school: '', department: '', subject: '', professor: '', description: '',
     grade: '', hasFeedback: false, assignmentFile: null, transcriptFile: null,
   })
   const [submitted, setSubmitted] = useState(false)
@@ -95,6 +96,7 @@ export default function UploadPage() {
         subject: form.subject,
         professor: form.professor || null,
         grade: form.grade,
+        description: form.description || null,
         file_url: filePath,
         transcript_url: transcriptPath,
         has_professor_feedback: form.hasFeedback,
@@ -200,6 +202,16 @@ export default function UploadPage() {
                     <label style={labelStyle}>교수명</label>
                     <input style={inputStyle} value={form.professor} onChange={e => update('professor', e.target.value)} placeholder="예: 김철수 교수" />
                   </div>
+                </div>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={labelStyle}>과제 설명</label>
+                  <textarea
+                    style={{ ...inputStyle, height: 100, resize: 'vertical', lineHeight: 1.6 }}
+                    value={form.description}
+                    onChange={e => update('description', e.target.value)}
+                    placeholder="과제 내용, 특징, 작성 방법 등을 간략히 소개해주세요."
+                  />
                 </div>
 
                 {error && <ErrorBox msg={error} />}
