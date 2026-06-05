@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Nav from '@/components/Nav'
 
-type Grade = 'A+' | 'A0' | 'B+' | 'B0' | 'other' | ''
+type ScoreLevel = '하' | '중하' | '중' | '중상' | '상' | ''
 
 type FormData = {
   title: string
@@ -13,18 +13,18 @@ type FormData = {
   department: string
   subject: string
   professor: string
-  grade: Grade
+  grade: ScoreLevel
   hasFeedback: boolean
   assignmentFile: File | null
   transcriptFile: File | null
 }
 
-const GRADES: { value: Grade; label: string }[] = [
-  { value: 'A+', label: 'A+' },
-  { value: 'A0', label: 'A0' },
-  { value: 'B+', label: 'B+' },
-  { value: 'B0', label: 'B0' },
-  { value: 'other', label: '기타' },
+const SCORE_LEVELS: { value: ScoreLevel; label: string; desc: string }[] = [
+  { value: '하', label: '하', desc: 'C 이하' },
+  { value: '중하', label: '중하', desc: 'B0~B+' },
+  { value: '중', label: '중', desc: 'B+ 내외' },
+  { value: '중상', label: '중상', desc: 'A0 내외' },
+  { value: '상', label: '상', desc: 'A+' },
 ]
 
 export default function UploadPage() {
@@ -51,7 +51,8 @@ export default function UploadPage() {
       }
     }
     if (step === 2) {
-      if (!form.grade) { setError('학점을 선택해주세요.'); return }
+      if (!form.grade) { setError('점수 수준을 선택해주세요.'); return }
+      if (!form.transcriptFile) { setError('성적 인증 이미지를 첨부해주세요.'); return }
     }
     setStep(s => s + 1)
   }
@@ -72,24 +73,19 @@ export default function UploadPage() {
       const fileExt = form.assignmentFile.name.split('.').pop()
       const filePath = `${user.id}/${assignmentId}/assignment.${fileExt}`
 
-      // 과제 파일 업로드
       const { error: uploadError } = await supabase.storage
         .from('assignments')
         .upload(filePath, form.assignmentFile)
       if (uploadError) throw uploadError
 
-      // 성적표 파일 업로드 (있으면)
-      let transcriptPath: string | null = null
-      if (form.transcriptFile) {
-        const tExt = form.transcriptFile.name.split('.').pop()
-        transcriptPath = `${user.id}/${assignmentId}/transcript.${tExt}`
-        const { error: tError } = await supabase.storage
-          .from('transcripts')
-          .upload(transcriptPath, form.transcriptFile)
-        if (tError) throw tError
-      }
+      // 성적 인증 이미지 업로드 (필수)
+      const tExt = form.transcriptFile!.name.split('.').pop()
+      const transcriptPath = `${user.id}/${assignmentId}/transcript.${tExt}`
+      const { error: tError } = await supabase.storage
+        .from('transcripts')
+        .upload(transcriptPath, form.transcriptFile!)
+      if (tError) throw tError
 
-      // DB에 과제 정보 저장
       const { error: dbError } = await supabase.from('assignments').insert({
         id: assignmentId,
         uploader_id: user.id,
@@ -113,9 +109,6 @@ export default function UploadPage() {
     }
   }
 
-  const isExcellent = form.grade === 'A+' || form.grade === 'A0'
-  const expectedPoints = 30 + (isExcellent ? 50 : 0) + (form.hasFeedback && isExcellent ? 20 : 0)
-
   if (submitted) {
     return (
       <>
@@ -130,9 +123,9 @@ export default function UploadPage() {
             </p>
             <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '16px 20px', marginBottom: 24, textAlign: 'left' }}>
               <div style={{ fontSize: 13, color: 'var(--subtext)', marginBottom: 8 }}>예상 적립 포인트</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--gold)' }}>+{expectedPoints} P</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--gold)' }}>+30P~</div>
               <div style={{ fontSize: 12, color: 'var(--subtext)', marginTop: 4 }}>
-                기본 30P{isExcellent ? ' + 우수과제 50P' : ''}{form.hasFeedback && isExcellent ? ' + 피드백 20P' : ''}
+                기본 30P · 우수과제 인정 시 최대 +100P
               </div>
             </div>
             <Link href="/" style={{
@@ -217,49 +210,53 @@ export default function UploadPage() {
             {/* ── STEP 2 ── */}
             {step === 2 && (
               <div>
-                <div style={{ fontSize: 13, color: 'var(--subtext)', marginBottom: 20 }}>2단계 · 성적 인증 (우수과제 등록)</div>
+                <div style={{ fontSize: 13, color: 'var(--subtext)', marginBottom: 20 }}>2단계 · 점수 수준 및 성적 인증</div>
 
-                <div style={{ marginBottom: 18 }}>
-                  <label style={labelStyle}>취득 학점 *</label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {GRADES.map(g => (
+                <div style={{ marginBottom: 20 }}>
+                  <label style={labelStyle}>받은 점수 수준 *</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {SCORE_LEVELS.map(s => (
                       <button
-                        key={g.value}
-                        onClick={() => update('grade', g.value)}
+                        key={s.value}
+                        onClick={() => update('grade', s.value)}
                         style={{
-                          flex: 1, minWidth: 60, padding: '10px 8px', textAlign: 'center',
-                          borderRadius: 8, fontSize: 13, fontWeight: 700,
-                          border: `1.5px solid ${form.grade === g.value ? 'var(--gold)' : 'var(--border)'}`,
-                          background: form.grade === g.value ? 'var(--gold-bg)' : 'var(--bg)',
-                          color: form.grade === g.value ? 'var(--gold)' : 'var(--subtext)',
+                          flex: 1, padding: '12px 4px', textAlign: 'center',
+                          borderRadius: 8, fontSize: 14, fontWeight: 700,
+                          border: `1.5px solid ${form.grade === s.value ? 'var(--gold)' : 'var(--border)'}`,
+                          background: form.grade === s.value ? 'var(--gold-bg)' : 'var(--bg)',
+                          color: form.grade === s.value ? 'var(--gold)' : 'var(--subtext)',
                           cursor: 'pointer', transition: 'all .15s', fontFamily: 'inherit',
                         }}
                       >
-                        {g.label}
+                        {s.label}
                       </button>
                     ))}
                   </div>
+                  {form.grade && (
+                    <div style={{ fontSize: 12, color: 'var(--subtext)', marginTop: 6 }}>
+                      선택: <strong style={{ color: 'var(--gold)' }}>{form.grade}</strong>
+                      {' '}({SCORE_LEVELS.find(s => s.value === form.grade)?.desc})
+                    </div>
+                  )}
                 </div>
 
-                {isExcellent && (
-                  <div style={{ marginBottom: 18 }}>
-                    <label style={labelStyle}>성적표 이미지 업로드 (A+/A0 필수)</label>
-                    <label style={{
-                      display: 'block', border: '1.5px dashed var(--border)', borderRadius: 12,
-                      padding: 24, textAlign: 'center', color: 'var(--subtext)',
-                      fontSize: 13, cursor: 'pointer', transition: 'border-color .15s', background: 'var(--bg)',
-                    }}>
-                      <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={e => update('transcriptFile', e.target.files?.[0] ?? null)} />
-                      {form.transcriptFile
-                        ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>✅ {form.transcriptFile.name}</span>
-                        : <>📎 성적확인서 또는 성적표 이미지 첨부<br /><span style={{ fontSize: 11 }}>JPG, PNG, PDF · 최대 5MB</span></>
-                      }
-                    </label>
-                    <div style={{ background: 'var(--gold-bg)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--gold)', marginTop: 8, lineHeight: 1.6 }}>
-                      ⚠ 이름·학번은 모자이크 처리 후 1~2 영업일 내 검수합니다.
-                    </div>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={labelStyle}>성적 인증 이미지 * <span style={{ fontWeight: 400, color: 'var(--subtext)' }}>(모든 과제 필수)</span></label>
+                  <label style={{
+                    display: 'block', border: `1.5px dashed ${form.transcriptFile ? 'var(--green)' : 'var(--border)'}`,
+                    borderRadius: 12, padding: 24, textAlign: 'center', color: 'var(--subtext)',
+                    fontSize: 13, cursor: 'pointer', transition: 'border-color .15s', background: 'var(--bg)',
+                  }}>
+                    <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={e => update('transcriptFile', e.target.files?.[0] ?? null)} />
+                    {form.transcriptFile
+                      ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>✅ {form.transcriptFile.name}</span>
+                      : <>📎 성적확인서 또는 성적표 이미지 첨부<br /><span style={{ fontSize: 11 }}>JPG, PNG, PDF · 최대 5MB</span></>
+                    }
+                  </label>
+                  <div style={{ background: 'var(--gold-bg)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--gold)', marginTop: 8, lineHeight: 1.6 }}>
+                    ⚠ 이름·학번은 모자이크 처리 후 검수합니다. 승인/거절 후 이미지는 자동 삭제됩니다.
                   </div>
-                )}
+                </div>
 
                 <div style={{ marginBottom: 20 }}>
                   <label style={labelStyle}>교수 피드백 포함 여부</label>
@@ -298,8 +295,8 @@ export default function UploadPage() {
                 <div style={{ marginBottom: 18 }}>
                   <label style={labelStyle}>과제 파일 업로드 *</label>
                   <label style={{
-                    display: 'block', border: '1.5px dashed var(--border)', borderRadius: 12,
-                    padding: 28, textAlign: 'center', color: 'var(--subtext)',
+                    display: 'block', border: `1.5px dashed ${form.assignmentFile ? 'var(--green)' : 'var(--border)'}`,
+                    borderRadius: 12, padding: 28, textAlign: 'center', color: 'var(--subtext)',
                     fontSize: 13, cursor: 'pointer', transition: 'border-color .15s', background: 'var(--bg)',
                   }}>
                     <input type="file" accept=".pdf,.doc,.docx,.hwp,.ppt,.pptx,.zip,.py,.ipynb" style={{ display: 'none' }} onChange={e => update('assignmentFile', e.target.files?.[0] ?? null)} />
@@ -313,13 +310,14 @@ export default function UploadPage() {
                 {/* 업로드 요약 */}
                 <div style={{ background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 14, fontSize: 13, color: 'var(--subtext)', lineHeight: 1.8 }}>
                   <strong style={{ color: 'var(--text)' }}>{form.title || '(제목 없음)'}</strong><br />
-                  {form.school} · {form.department} · 학점 {form.grade || '미선택'}
+                  {form.school} · {form.department} · 점수 수준 {form.grade || '미선택'}
+                  {form.hasFeedback ? ' · 교수 피드백 포함' : ''}
                 </div>
 
                 {/* 예상 포인트 */}
                 <div style={{ background: 'var(--green-bg)', border: '1px solid rgba(4,120,87,.2)', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: 'var(--green)', marginBottom: 20 }}>
-                  💰 예상 획득 포인트: <strong style={{ fontSize: 16 }}>+{expectedPoints}P</strong>
-                  &nbsp;(기본 30P{isExcellent ? ' + 우수과제 50P' : ''}{form.hasFeedback && isExcellent ? ' + 피드백 20P' : ''})
+                  💰 기본 획득 포인트: <strong style={{ fontSize: 16 }}>+30P</strong>
+                  <span style={{ fontSize: 12, marginLeft: 6 }}>(우수과제 인정 시 최대 +100P)</span>
                 </div>
 
                 {error && <ErrorBox msg={error} />}

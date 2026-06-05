@@ -5,7 +5,7 @@ export type Assignment = {
   department: string
   subject: string
   professor: string | null
-  grade: 'A+' | 'A0' | 'B+' | 'B0' | 'other'
+  grade: '하' | '중하' | '중' | '중상' | '상'
   file_url: string
   transcript_url: string | null
   has_professor_feedback: boolean
@@ -22,6 +22,7 @@ export type Profile = {
   email: string
   nickname: string
   points: number
+  is_admin: boolean
   created_at: string
 }
 

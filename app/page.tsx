@@ -107,8 +107,8 @@ export default function Home() {
   const filtered = useMemo(() => {
     return assignments.filter(a => {
       if (filterDept && a.department !== filterDept) return false
-      if (filterGrade === 'A+만' && a.grade !== 'A+') return false
-      if (filterGrade === 'A0이상' && a.grade !== 'A+' && a.grade !== 'A0') return false
+      if (filterGrade === '상만' && a.grade !== '상') return false
+      if (filterGrade === '중상이상' && a.grade !== '상' && a.grade !== '중상') return false
       if (filterBookmark && !bookmarks.includes(a.id)) return false
       if (search) {
         const q = search.toLowerCase()
@@ -169,9 +169,9 @@ export default function Home() {
               padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer',
             }}
           >
-            <option value="">🏅 전체 학점</option>
-            <option value="A+만">A+ 만</option>
-            <option value="A0이상">A0 이상</option>
+            <option value="">🏅 전체 점수</option>
+            <option value="상만">상 만</option>
+            <option value="중상이상">중상 이상</option>
           </select>
 
           <button

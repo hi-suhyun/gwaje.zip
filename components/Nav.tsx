@@ -73,6 +73,14 @@ export default function Nav() {
                 📤 업로드
               </Link>
 
+              <Link href="/profile" style={{
+                fontSize: 14, fontWeight: 600,
+                color: pathname === '/profile' ? 'var(--text)' : 'var(--subtext)',
+                textDecoration: 'none',
+              }}>
+                {profile.nickname}
+              </Link>
+
               <button onClick={handleLogout} style={{
                 background: 'none', border: '1.5px solid var(--border)',
                 color: 'var(--subtext)', borderRadius: 10,
