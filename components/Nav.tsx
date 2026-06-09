@@ -46,6 +46,14 @@ export default function Nav() {
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Link href="/intro" style={{
+            fontSize: 14, fontWeight: 600,
+            color: pathname === '/intro' ? 'var(--text)' : 'var(--subtext)',
+            textDecoration: 'none',
+          }}>
+            서비스 소개
+          </Link>
+
           <Link href="/" style={{
             fontSize: 14, fontWeight: 600,
             color: pathname === '/' ? 'var(--text)' : 'var(--subtext)',
