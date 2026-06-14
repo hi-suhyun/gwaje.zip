@@ -43,13 +43,20 @@ export default function AuthPage() {
         router.refresh()
       } else {
         if (!nickname.trim()) { setError('닉네임을 입력해주세요.'); setLoading(false); return }
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { nickname } },
         })
         if (error) throw error
-        setSuccess('가입 확인 이메일을 발송했습니다. 이메일을 확인해주세요.')
+
+        if (data.session) {
+          // 이메일 확인이 꺼져있으면 가입 즉시 세션이 발급됨 → 바로 로그인 처리
+          router.push('/')
+          router.refresh()
+        } else {
+          setSuccess('가입 확인 이메일을 발송했습니다. 이메일을 확인해주세요.')
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '오류가 발생했습니다.'

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Nav from '@/components/Nav'
 import AssignmentCard from '@/components/AssignmentCard'
 import DownloadModal from '@/components/DownloadModal'
-import { MOCK_ASSIGNMENTS, DEPARTMENTS } from '@/lib/mock-data'
+import { MOCK_ASSIGNMENTS } from '@/lib/mock-data'
 import { confirmDownloadAction } from '@/app/actions/download'
 import type { Assignment } from '@/types'
 
@@ -133,6 +133,10 @@ export default function Home() {
       return true
     })
   }, [assignments, filterDept, filterGrade, filterBookmark, search, bookmarks])
+
+  const departments = useMemo(() => {
+    return Array.from(new Set(assignments.map(a => a.department))).sort()
+  }, [assignments])
 
   const targetAssignment = downloadTarget ? assignments.find(a => a.id === downloadTarget) : null
 
@@ -323,7 +327,7 @@ export default function Home() {
             }}
           >
             <option value="">📚 전체 학과</option>
-            {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+            {departments.map(d => <option key={d}>{d}</option>)}
           </select>
 
           <select
