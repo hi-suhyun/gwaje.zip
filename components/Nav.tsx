@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { getProfileAction } from '@/app/actions/download'
+import { trackEvent } from '@/lib/gtag'
 
 type Profile = { nickname: string; points: number } | null
 
@@ -73,7 +74,7 @@ export default function Nav() {
                 ⬡ {profile.points} P
               </div>
 
-              <Link href="/upload" style={{
+              <Link href="/upload" onClick={() => trackEvent('cta_upload_click', { logged_in: true })} style={{
                 background: 'var(--primary)', color: '#fff',
                 borderRadius: 10, padding: '10px 18px',
                 fontSize: 14, fontWeight: 700, textDecoration: 'none',
@@ -101,14 +102,14 @@ export default function Nav() {
 
           {!loading && !profile && (
             <>
-              <Link href="/upload" style={{
+              <Link href="/upload" onClick={() => trackEvent('cta_upload_click', { logged_in: false })} style={{
                 background: 'var(--primary)', color: '#fff',
                 borderRadius: 10, padding: '10px 18px',
                 fontSize: 14, fontWeight: 700, textDecoration: 'none',
               }}>
                 📤 업로드
               </Link>
-              <Link href="/auth" style={{
+              <Link href="/auth" onClick={() => trackEvent('cta_login_click')} style={{
                 background: 'none', border: '1.5px solid var(--border)',
                 color: 'var(--text)', borderRadius: 10,
                 padding: '9px 18px', fontSize: 14, fontWeight: 600, textDecoration: 'none',

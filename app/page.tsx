@@ -8,6 +8,7 @@ import AssignmentCard from '@/components/AssignmentCard'
 import DownloadModal from '@/components/DownloadModal'
 import { MOCK_ASSIGNMENTS } from '@/lib/mock-data'
 import { confirmDownloadAction } from '@/app/actions/download'
+import { trackEvent } from '@/lib/gtag'
 import type { Assignment } from '@/types'
 
 type AssignmentWithLikes = Assignment & { likes: number }
@@ -86,6 +87,7 @@ export default function Home() {
       setUserPoints(prev => prev - 10)
       window.open(result.url, '_blank')
       showToast('✅ 다운로드 완료!')
+      trackEvent('download_complete', { assignment_id: downloadTarget })
     }
   }
 
@@ -109,10 +111,12 @@ export default function Home() {
       await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('assignment_id', id)
       setBookmarks(prev => prev.filter(b => b !== id))
       showToast('북마크 해제됨')
+      trackEvent('bookmark_toggle', { assignment_id: id, action: 'remove' })
     } else {
       await supabase.from('bookmarks').insert({ user_id: user.id, assignment_id: id })
       setBookmarks(prev => [...prev, id])
       showToast('🔖 북마크 추가됨')
+      trackEvent('bookmark_toggle', { assignment_id: id, action: 'add' })
     }
   }
 
@@ -168,7 +172,7 @@ export default function Home() {
             더 빠르게 만들어보세요.
           </p>
           <div style={{ display: 'flex', gap: 14, marginBottom: 32, flexWrap: 'wrap' }}>
-            <Link href="/upload" style={{
+            <Link href="/upload" onClick={() => trackEvent('cta_upload_click', { logged_in: !!userId, location: 'hero' })} style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               background: 'var(--primary)', color: '#fff', border: 'none',
               borderRadius: 14, padding: '18px 36px',
@@ -384,7 +388,10 @@ export default function Home() {
                 userId={userId}
                 isDownloaded={downloads.includes(a.id)}
                 isBookmarked={bookmarks.includes(a.id)}
-                onDownload={id => userId ? setDownloadTarget(id) : router.push('/auth')}
+                onDownload={id => {
+                  trackEvent('download_attempt', { assignment_id: id, logged_in: !!userId })
+                  userId ? setDownloadTarget(id) : router.push('/auth')
+                }}
                 onRedownload={redownload}
                 onBookmark={toggleBookmark}
               />
