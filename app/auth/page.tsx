@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 type Tab = 'login' | 'signup'
 
@@ -12,7 +11,6 @@ const SUPABASE_READY =
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export default function AuthPage() {
-  const router = useRouter()
   const [tab, setTab] = useState<Tab>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,8 +37,7 @@ export default function AuthPage() {
       if (tab === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/')
-        router.refresh()
+        window.location.href = '/'
       } else {
         if (!nickname.trim()) { setError('닉네임을 입력해주세요.'); setLoading(false); return }
         const { data, error } = await supabase.auth.signUp({
@@ -52,8 +49,7 @@ export default function AuthPage() {
 
         if (data.session) {
           // 이메일 확인이 꺼져있으면 가입 즉시 세션이 발급됨 → 바로 로그인 처리
-          router.push('/')
-          router.refresh()
+          window.location.href = '/'
         } else {
           setSuccess('가입 확인 이메일을 발송했습니다. 이메일을 확인해주세요.')
         }

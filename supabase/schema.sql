@@ -153,10 +153,30 @@ $$;
 insert into storage.buckets (id, name, public) values ('assignments', 'assignments', false);
 insert into storage.buckets (id, name, public) values ('transcripts', 'transcripts', false);
 
--- 과제 파일: 본인만 업로드, 다운로드한 사람만 조회
+-- 과제 파일: 본인만 업로드, 업로더 본인 또는 다운로드한 사람만 조회 (signed URL 발급용)
 create policy "과제 파일 업로드" on storage.objects for insert
   with check (bucket_id = 'assignments' and auth.role() = 'authenticated');
 
--- 성적표 파일: 본인만 업로드, 관리자만 조회 (RLS는 서버에서 별도 처리)
+create policy "과제 파일 조회" on storage.objects for select
+  using (
+    bucket_id = 'assignments' and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or exists (
+        select 1 from downloads
+        where downloads.user_id = auth.uid()
+          and downloads.assignment_id::text = (storage.foldername(name))[2]
+      )
+    )
+  );
+
+-- 성적표 파일: 본인만 업로드, 본인 또는 관리자만 조회
 create policy "성적표 업로드" on storage.objects for insert
   with check (bucket_id = 'transcripts' and auth.role() = 'authenticated');
+
+create policy "성적표 조회" on storage.objects for select
+  using (
+    bucket_id = 'transcripts' and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+    )
+  );

@@ -11,7 +11,7 @@
 `과제.zip`은 성적 인증 기반의 대학생 과제 공유 플랫폼입니다.
 
 - 과제를 업로드하면 포인트를 받고, 포인트로 다른 과제를 다운로드합니다.
-- 성적표 이미지를 업로드해 운영자 검수를 통과하면 ⭐ 우수과제 배지가 부여됩니다.
+- 성적표 이미지를 업로드해 운영자 검수를 통과하면 최종 업로드됩니다.
 - 학과·과목·교수명 검색, 북마크, 다운로드 이력 관리 등 기능을 제공합니다.
 
 ---
@@ -81,18 +81,12 @@ NEXT_PUBLIC_GAS_ENDPOINT=https://script.google.com/macros/s/...
 UPDATE profiles SET is_admin = true WHERE email = '본인이메일@example.com';
 ```
 
-추가로 아래 SQL을 실행해야 관리자가 미승인 과제와 성적표를 조회할 수 있습니다:
+추가로 아래 SQL을 실행해야 관리자가 미승인 과제를 조회할 수 있습니다 (성적표 조회 정책은 `schema.sql`에 포함되어 있음):
 
 ```sql
 -- 관리자 전용 RLS 정책
 CREATE POLICY "관리자 전체 과제 조회" ON assignments
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
-  );
-
-CREATE POLICY "관리자 성적표 조회" ON storage.objects
-  FOR SELECT USING (
-    bucket_id = 'transcripts' AND
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
   );
 ```
@@ -201,6 +195,7 @@ gwaje.zip/
 │   ├── DownloadModal.tsx
 │   └── Tracking.tsx          # GA4 + GAS 방문자 추적
 ├── lib/
+│   ├── gtag.ts               # GA4 이벤트 트래킹 헬퍼
 │   ├── supabase/             # Supabase 클라이언트
 │   └── mock-data.ts          # DB 없을 때 폴백 데이터
 ├── supabase/

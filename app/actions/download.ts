@@ -25,7 +25,7 @@ export async function confirmDownloadAction(assignmentId: string) {
     .maybeSingle()
 
   if (existing) {
-    return { url: buildPublicUrl(assignment.file_url) }
+    return { url: await buildSignedUrl(supabase, assignment.file_url) }
   }
 
   // 포인트 확인
@@ -54,7 +54,7 @@ export async function confirmDownloadAction(assignmentId: string) {
     supabase.rpc('increment_download_count', { p_assignment_id: assignmentId }),
   ])
 
-  return { url: buildPublicUrl(assignment.file_url) }
+  return { url: await buildSignedUrl(supabase, assignment.file_url) }
 }
 
 export async function getProfileAction() {
@@ -71,6 +71,11 @@ export async function getProfileAction() {
   return profile
 }
 
-function buildPublicUrl(filePath: string) {
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assignments/${filePath}`
+async function buildSignedUrl(supabase: Awaited<ReturnType<typeof createClient>>, filePath: string) {
+  const { data, error } = await supabase.storage
+    .from('assignments')
+    .createSignedUrl(filePath, 60)
+
+  if (error || !data) return null
+  return data.signedUrl
 }
